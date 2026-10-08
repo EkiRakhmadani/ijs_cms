@@ -1,6 +1,7 @@
 <?php
 
 use App\Content\Exporters\ServiceExporter;
+use App\Content\Exporters\SocialPostExporter;
 
 return [
 
@@ -37,6 +38,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Storage Prune Grace Period
+    |--------------------------------------------------------------------------
+    |
+    | How long an uploaded file is left alone before `--prune` will consider
+    | it abandoned. Filament writes a file the moment it is chosen, before the
+    | form is saved, so without this window a publish could delete an upload
+    | belonging to a form somebody still has open.
+    |
+    */
+
+    'storage_prune_grace_minutes' => 60,
+
+    /*
+    |--------------------------------------------------------------------------
     | Exporters
     |--------------------------------------------------------------------------
     |
@@ -47,6 +62,7 @@ return [
 
     'exporters' => [
         ServiceExporter::class,
+        SocialPostExporter::class,
     ],
 
 ];

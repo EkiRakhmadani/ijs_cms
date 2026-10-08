@@ -41,7 +41,17 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
-            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
+            /*
+             * Root-relative on purpose. APP_URL here carries no port — the
+             * app binds whichever port happens to be free — so an absolute
+             * URL built from it points at port 80, and the admin panel shows
+             * broken image previews. A relative path resolves against
+             * whatever host and port the panel is actually open on.
+             *
+             * Set FILESYSTEM_PUBLIC_URL to an absolute URL if these files
+             * ever move to a CDN or a host of their own.
+             */
+            'url' => env('FILESYSTEM_PUBLIC_URL', '/storage'),
             'visibility' => 'public',
             'throw' => false,
             'report' => false,

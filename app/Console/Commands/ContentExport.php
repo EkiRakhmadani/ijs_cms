@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Content\ContentWriter;
 use App\Content\Contracts\Exporter;
+use App\Content\MediaPublisher;
 use Illuminate\Console\Command;
 use RuntimeException;
 
@@ -17,7 +18,8 @@ use RuntimeException;
 class ContentExport extends Command
 {
     protected $signature = 'content:export
-                            {--dry-run : Show what would be written without writing it}';
+                            {--dry-run : Show what would be written without writing it}
+                            {--prune : Delete published media no longer backed by an asset}';
 
     protected $description = 'Publish CMS content into the frontend as static JSON';
 
@@ -31,6 +33,10 @@ class ContentExport extends Command
             $this->components->error($e->getMessage());
 
             return self::FAILURE;
+        }
+
+        if (($media = $this->publishMedia()) !== self::SUCCESS) {
+            return $media;
         }
 
         /** @var list<class-string<Exporter>> $exporters */
@@ -100,6 +106,74 @@ class ContentExport extends Command
                 ? 'Already up to date.'
                 : "{$changed} file(s) updated. Rebuild the frontend to publish them."
         );
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Copy uploaded files across before the JSON that points at them, so the
+     * frontend is never left referencing a picture that is not there yet.
+     */
+    private function publishMedia(): int
+    {
+        $publisher = MediaPublisher::fromConfig();
+
+        if ($this->option('dry-run')) {
+            $orphans = count($publisher->orphans());
+            $this->components->twoColumnDetail(
+                'media',
+                $orphans === 0 ? '<fg=gray>no orphans</>' : "{$orphans} orphan(s) would be left"
+            );
+
+            return self::SUCCESS;
+        }
+
+        try {
+            $result = $publisher->publish();
+        } catch (RuntimeException $e) {
+            $this->components->error("media: {$e->getMessage()}");
+
+            return self::FAILURE;
+        }
+
+        $copied = count($result['copied']);
+
+        $this->components->twoColumnDetail(
+            'media',
+            $copied === 0
+                ? sprintf('<fg=gray>%d already published</>', $result['skipped'])
+                : sprintf('<fg=green>%d copied</>, %d already published', $copied, $result['skipped'])
+        );
+
+        // An asset row whose file has gone is a broken picture on the site,
+        // so say so rather than publishing JSON that points at nothing.
+        foreach ($result['missing'] as $missing) {
+            $this->components->warn("Media file missing on disk, skipped: {$missing}");
+        }
+
+        if ($this->option('prune')) {
+            $removed = count($publisher->prune());
+            $this->components->twoColumnDetail(
+                'prune frontend',
+                $removed === 0 ? '<fg=gray>nothing to remove</>' : "<fg=yellow>{$removed} removed</>"
+            );
+
+            $removedUploads = count($publisher->pruneStorage());
+            $this->components->twoColumnDetail(
+                'prune uploads',
+                $removedUploads === 0 ? '<fg=gray>nothing to remove</>' : "<fg=yellow>{$removedUploads} removed</>"
+            );
+
+            return self::SUCCESS;
+        }
+
+        if (($orphans = count($publisher->orphans())) > 0) {
+            $this->components->warn("{$orphans} published file(s) no longer used. Run with --prune to remove them.");
+        }
+
+        if (($abandoned = count($publisher->storageOrphans())) > 0) {
+            $this->components->warn("{$abandoned} uploaded file(s) no longer referenced. Run with --prune to remove them.");
+        }
 
         return self::SUCCESS;
     }
