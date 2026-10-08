@@ -1,7 +1,10 @@
 <?php
 
+use App\Content\Exporters\ContactExporter;
+use App\Content\Exporters\SeoExporter;
 use App\Content\Exporters\ServiceExporter;
 use App\Content\Exporters\SocialPostExporter;
+use App\Content\Exporters\UiStringExporter;
 
 return [
 
@@ -63,6 +66,9 @@ return [
     'exporters' => [
         ServiceExporter::class,
         SocialPostExporter::class,
+        ContactExporter::class,
+        UiStringExporter::class,
+        SeoExporter::class,
     ],
 
 ];
